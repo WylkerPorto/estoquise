@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CAIXA
+  ESTOQUE
+}
+
+model User {
+  id       Int      @id @default(autoincrement())
+  name     String
+  login    String   @unique
+  password String
+  role     UserRole @default(CAIXA)
+
+  movements Movement[]
+  cashiers  Cashier[]
+  logs      Log[]
+}
+
+model Product {
+  id       Int     @id @default(autoincrement())
+  name     String
+  price    Decimal @db.Decimal(10, 2)
+  quantity Int
+  obs      String?
+
+  movementItems MovementItem[]
+}
+
+enum MovementType {
+  ENTRY
+  EXIT
+}
+
+model Movement {
+  id        Int          @id @default(autoincrement())
+  type      MovementType
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id])
+  createdAt DateTime     @default(now())
+
+  movementItems MovementItem[]
+}
+
+model MovementItem {
+  id         Int     @id @default(autoincrement())
+  movementId Int
+  productId  Int
+  quantity   Int
+  price      Decimal @db.Decimal(10, 2)
+
+  movement Movement @relation(fields: [movementId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+}
+
+enum CashierStatus {
+  AVAILABLE
+  BUSY
+}
+
+model Cashier {
+  id     Int           @id @default(autoincrement())
+  name   String
+  status CashierStatus @default(AVAILABLE)
+  userId Int           @unique
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Log {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  action    String
+  detail    Json
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
