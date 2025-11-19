@@ -3,12 +3,17 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  NotFoundException,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 
 // Mocks
 const prismaMock = {
   user: {
     findUnique: jest.fn(),
+    create: jest.fn(),
   },
 };
 
@@ -17,6 +22,7 @@ const jwtServiceMock = {
 };
 
 jest.mock('bcrypt', () => ({
+  hash: jest.fn(),
   compare: jest.fn(),
 }));
 
@@ -140,7 +146,7 @@ describe('AuthService Register', () => {
     jest.clearAllMocks();
   });
 
-  it('Can return ok in register', async () => {
+  it('Can return error if user already exists', async () => {
     const dto = {
       login: 'admin',
       password: 'hashed_password',
@@ -148,6 +154,121 @@ describe('AuthService Register', () => {
       role: 'ADMIN',
     };
 
-    await expect(service.register(dto)).toEqual('ok');
+    prisma.user.findUnique.mockResolvedValue({
+      id: 1,
+      login: 'admin',
+      password: 'hashed_password',
+      name: 'Administrador',
+      role: 'ADMIN',
+    });
+
+    await expect(service.register(dto)).rejects.toThrow(ConflictException);
+  });
+
+  it('should create user and return ok', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue({ id: 1 });
+
+    const dto = {
+      login: 'admin',
+      password: 'hashed_password',
+      name: 'Administrador',
+      role: 'NEW',
+    };
+
+    await expect(service.register(dto)).resolves.toEqual({ ok: true });
+    expect(prisma.user.create).toHaveBeenCalled();
+  });
+
+  it('should hash password before saving user', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue({ id: 1 });
+
+    // mock do hash
+    const hashed = 'hashed_pw_123';
+    (bcrypt.hash as jest.Mock).mockResolvedValue(hashed);
+
+    const dto = {
+      login: 'admin',
+      password: '1234',
+      name: 'Administrador',
+      role: 'NEW',
+    };
+
+    await service.register(dto);
+
+    // 1) bcrypt.hash deve ser chamado com a senha original
+    expect(bcrypt.hash).toHaveBeenCalledWith('1234', expect.any(Number));
+
+    // 2) user.create deve receber a senha hasheada
+    expect(prisma.user.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        password: hashed, // senha HASHEADA
+      }),
+    });
+
+    // 3) Garantir que NÃO foi usada a senha original
+    expect(prisma.user.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          password: '1234',
+        }),
+      }),
+    );
+  });
+
+  it('should save user with role NEW', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    const hashed = 'hashed_pw_123';
+    (bcrypt.hash as jest.Mock).mockResolvedValue(hashed);
+
+    const dto = {
+      login: 'admin',
+      password: '1234',
+      name: 'Administrador',
+      role: 'SHOULD_BE_IGNORED',
+    };
+
+    await service.register(dto);
+
+    expect(prisma.user.create).toHaveBeenCalledWith({
+      data: {
+        ...dto,
+        password: hashed,
+        role: 'NEW', // <- AQUI que testamos!
+      },
+    });
+  });
+
+  it('should hash the password using bcrypt with salt rounds = 10', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    const hashed = 'hashed_pw_anything';
+    (bcrypt.hash as jest.Mock).mockResolvedValue(hashed);
+
+    prisma.user.create.mockResolvedValue({ id: 1 });
+
+    const dto = {
+      login: 'newuser',
+      password: 'mypassword',
+      name: 'User Teste',
+      role: 'NEW',
+    };
+
+    const result = await service.register(dto);
+
+    expect(bcrypt.hash).toHaveBeenCalledWith('mypassword', 10); // <— valida rounds
+
+    expect(prisma.user.create).toHaveBeenCalledWith({
+      data: {
+        login: 'newuser',
+        password: hashed,
+        name: 'User Teste',
+        role: 'NEW',
+      },
+    });
+
+    expect(result).toEqual({ ok: true });
   });
 });

@@ -12,6 +12,7 @@ enum UserRole {
   ADMIN
   CAIXA
   ESTOQUE
+  NOVO
 }
 
 model User {

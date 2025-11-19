@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -45,5 +46,25 @@ export class AuthService {
     };
   }
 
-  async register(dto: RegisterDto) {}
+  async register(dto: RegisterDto) {
+    const userAlreadyExist = await this.prisma.user.findUnique({
+      where: { login: dto.login },
+    });
+
+    if (userAlreadyExist) {
+      throw new ConflictException('Usuário já cadastrado');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    await this.prisma.user.create({
+      data: {
+        ...dto,
+        role: 'NEW',
+        password: hashedPassword,
+      },
+    });
+
+    return { ok: true };
+  }
 }
