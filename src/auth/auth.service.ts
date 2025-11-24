@@ -23,7 +23,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new UnauthorizedException('Not found');
     }
 
     const valid = await bcrypt.compare(dto.password, user.password);
