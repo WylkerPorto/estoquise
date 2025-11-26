@@ -2,10 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { Role } from '../../common/enums/role.enum';
 
-export class RegisterDto {
+export class CreateUserDto {
   @ApiProperty({
-    description: 'Nome do usuário',
-    example: 'Felipe',
+    description: 'Nome completo do usuário',
+    example: 'João Silva',
     minLength: 5,
   })
   @IsNotEmpty()
@@ -40,5 +40,5 @@ export class RegisterDto {
   })
   @IsNotEmpty()
   @IsEnum(Role)
-  role: Role.NOVO;
+  role: Role;
 }
