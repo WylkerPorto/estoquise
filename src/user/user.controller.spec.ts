@@ -34,6 +34,10 @@ describe('UserController', () => {
     jest.clearAllMocks();
   });
 
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+
   describe('create', () => {
     it('should create and return the created user', async () => {
       const dto: CreateUserDto = {

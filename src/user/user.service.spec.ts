@@ -3,11 +3,7 @@ import { UserService } from './user.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import {
-  UnauthorizedException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 // Mocks
