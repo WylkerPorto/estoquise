@@ -4,7 +4,7 @@ import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { UserModule } from '../src/user/user.module';
 import { Role } from '../src/common/enums/role.enum';
-import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 
 // cria um guard customizável para cada teste

@@ -4,7 +4,7 @@ import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ProductModule } from '../src/product/product.module';
 import { Role } from '../src/common/enums/role.enum';
-import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 
 // cria um guard customizável para cada teste
@@ -158,6 +158,20 @@ describe('ProductsController (e2e)', () => {
           quantity: 50,
         })
         .expect(403);
+    });
+
+    it('should fail with invalid data', async () => {
+      await initWithUser({ id: 1, role: Role.ADMIN });
+
+      await request(app.getHttpServer())
+        .post('/products')
+        .send({
+          name: 'Pr',
+          obs: 'Description A',
+          price: -100,
+          quantity: -50,
+        })
+        .expect(400);
     });
   });
 
