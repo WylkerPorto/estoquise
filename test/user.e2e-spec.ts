@@ -50,20 +50,17 @@ describe('UsersController (e2e)', () => {
       .useValue({
         canActivate(ctx) {
           const req = ctx.switchToHttp().getRequest();
-          const role = req.user?.role;
-          const method = req.method;
-          const url = req.originalUrl || req.url || '';
+          const handler = ctx.getHandler();
 
-          // regras simples compatíveis com os testes:
-          // - criação/listagem/remoção (POST /users, GET /users, DELETE /users/:id) só ADMIN
-          if (method === 'POST' && url.startsWith('/users'))
-            return role === Role.ADMIN;
-          if (method === 'GET' && url === '/users') return role === Role.ADMIN;
-          if (method === 'DELETE' && url.startsWith('/users'))
-            return role === Role.ADMIN;
+          const requiredRoles = Reflect.getMetadata('roles', handler) || [];
 
-          // outros endpoints delegam (OwnerOrAdminGuard será responsável)
-          return true;
+          const userRole = req.user?.role;
+
+          if (requiredRoles.length === 0) {
+            return true;
+          }
+
+          return requiredRoles.includes(userRole);
         },
       })
       .compile();
@@ -111,7 +108,7 @@ describe('UsersController (e2e)', () => {
     });
 
     it('USER should not create a user', async () => {
-      await initWithUser({ id: 55, role: Role.USER });
+      await initWithUser({ id: 55, role: Role.NOVO });
 
       await request(app.getHttpServer())
         .post('/users')
@@ -140,7 +137,7 @@ describe('UsersController (e2e)', () => {
       expect(res.body.items).toEqual([]);
     });
 
-    it('USER should not list all users', async () => {
+    it('NOVO should not list all users', async () => {
       await initWithUser({ id: 2, role: Role.NOVO });
 
       await request(app.getHttpServer()).get('/users').expect(403);
@@ -213,8 +210,8 @@ describe('UsersController (e2e)', () => {
       expect(res.body.id).toBe(20);
     });
 
-    it('USER can update itself', async () => {
-      await initWithUser({ id: 50, role: Role.USER });
+    it('NOVO can update itself', async () => {
+      await initWithUser({ id: 50, role: Role.NOVO });
 
       prismaMock.user.update.mockResolvedValue({
         id: 50,
@@ -229,8 +226,8 @@ describe('UsersController (e2e)', () => {
       expect(res.body.id).toBe(50);
     });
 
-    it('USER cannot update another user', async () => {
-      await initWithUser({ id: 50, role: Role.USER });
+    it('NOVO cannot update another user', async () => {
+      await initWithUser({ id: 50, role: Role.NOVO });
 
       await request(app.getHttpServer())
         .patch('/users/90')

@@ -22,7 +22,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Products')
 @ApiBearerAuth()
-@Controller('product')
+@Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
@@ -37,26 +37,28 @@ export class ProductController {
   }
 
   // ---------------------------
-  // FIND ALL (TODOS OS ROLES exceto NOVO)
+  // FIND ALL (TODOS - NOVO)
   // ---------------------------
   @Get()
+  @Roles(Role.ADMIN, Role.ESTOQUE, Role.CAIXA)
   findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 10) {
     return this.productService.findAll(+page, +limit);
   }
 
   // ---------------------------
-  // FIND ONE (TODOS OS ROLES)
+  // FIND ONE (TODOS - NOVO)
   // ---------------------------
   @Get(':id')
+  @Roles(Role.ADMIN, Role.ESTOQUE, Role.CAIXA)
   findOne(@Param('id') id: string) {
     return this.productService.findOne(+id);
   }
 
   // ---------------------------
-  // UPDATE (ADMIN + ESTOQUE + CAIXA)
+  // UPDATE (ADMIN + ESTOQUE)
   // ---------------------------
   @Patch(':id')
-  @Roles(Role.ADMIN, Role.ESTOQUE, Role.CAIXA)
+  @Roles(Role.ADMIN, Role.ESTOQUE)
   update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
     return this.productService.update(+id, updateProductDto);
   }

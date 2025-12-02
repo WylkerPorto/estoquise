@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { ProductModule } from 'src/product/product.module';
+import { ProductModule } from '../src/product/product.module';
 import { Role } from '../src/common/enums/role.enum';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
 import { RolesGuard } from '../src/common/guards/roles.guard';
@@ -50,11 +50,17 @@ describe('ProductsController (e2e)', () => {
       .useValue({
         canActivate(ctx) {
           const req = ctx.switchToHttp().getRequest();
-          const role = req.user?.role;
-          const method = req.method;
-          const url = req.originalUrl || req.url || '';
+          const handler = ctx.getHandler();
 
-          return true;
+          const requiredRoles = Reflect.getMetadata('roles', handler) || [];
+
+          const userRole = req.user?.role;
+
+          if (requiredRoles.length === 0) {
+            return true;
+          }
+
+          return requiredRoles.includes(userRole);
         },
       })
       .compile();
@@ -73,31 +79,348 @@ describe('ProductsController (e2e)', () => {
   }
 
   afterEach(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   //-----------------------------
   // CREATE
   //-----------------------------
-  describe('POST /products', () => {});
+  describe('POST /products', () => {
+    it('ADMIN should create a product', async () => {
+      await initWithUser({ id: 1, role: Role.ADMIN });
+
+      const dto = {
+        name: 'Product A',
+        obs: 'Description A',
+        price: 100,
+        quantity: 50,
+      };
+
+      prismaMock.product.create.mockResolvedValue({
+        id: 1,
+        ...dto,
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/products')
+        .send(dto)
+        .expect(201);
+
+      expect(res.body.ok).toEqual(true);
+    });
+
+    it('ESTOQUE should create a product', async () => {
+      await initWithUser({ id: 1, role: Role.ESTOQUE });
+
+      const dto = {
+        name: 'Product A',
+        obs: 'Description A',
+        price: 100,
+        quantity: 50,
+      };
+
+      prismaMock.product.create.mockResolvedValue({
+        id: 1,
+        ...dto,
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/products')
+        .send(dto)
+        .expect(201);
+
+      expect(res.body.ok).toEqual(true);
+    });
+
+    it('NOVO should not create a product', async () => {
+      await initWithUser({ id: 1, role: Role.NOVO });
+
+      await request(app.getHttpServer())
+        .post('/products')
+        .send({
+          name: 'Product A',
+          obs: 'Description A',
+          price: 100,
+          quantity: 50,
+        })
+        .expect(403);
+    });
+
+    it('CAIXA should not create a product', async () => {
+      await initWithUser({ id: 1, role: Role.CAIXA });
+
+      await request(app.getHttpServer())
+        .post('/products')
+        .send({
+          name: 'Product A',
+          obs: 'Description A',
+          price: 100,
+          quantity: 50,
+        })
+        .expect(403);
+    });
+  });
 
   //-----------------------------
-  // FIND ALL
+  // GET ALL
   //-----------------------------
-  describe('GET /products', () => {});
+  describe('GET /products', () => {
+    it('ADMIN should get all products', async () => {
+      await initWithUser({ id: 1, role: Role.ADMIN });
+
+      prismaMock.product.findMany.mockResolvedValue([
+        {
+          id: 1,
+          name: 'Product A',
+          obs: 'Description A',
+          price: 100,
+          quantity: 50,
+        },
+        {
+          id: 2,
+          name: 'Product B',
+          obs: 'Description B',
+          price: 200,
+          quantity: 100,
+        },
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .get('/products')
+        .expect(200);
+
+      expect(res.body.items).toHaveLength(2);
+    });
+
+    it('ESTOQUE should get all products', async () => {
+      await initWithUser({ id: 1, role: Role.ESTOQUE });
+
+      prismaMock.product.findMany.mockResolvedValue([
+        {
+          id: 1,
+          name: 'Product A',
+          obs: 'Description A',
+          price: 100,
+          quantity: 50,
+        },
+        {
+          id: 2,
+          name: 'Product B',
+          obs: 'Description B',
+          price: 200,
+          quantity: 100,
+        },
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .get('/products')
+        .expect(200);
+
+      expect(res.body.items).toHaveLength(2);
+    });
+
+    it('CAIXA should get all products', async () => {
+      await initWithUser({ id: 1, role: Role.CAIXA });
+
+      prismaMock.product.findMany.mockResolvedValue([
+        {
+          id: 1,
+          name: 'Product A',
+          obs: 'Description A',
+          price: 100,
+          quantity: 50,
+        },
+        {
+          id: 2,
+          name: 'Product B',
+          obs: 'Description B',
+          price: 200,
+          quantity: 100,
+        },
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .get('/products')
+        .expect(200);
+
+      expect(res.body.items).toHaveLength(2);
+    });
+
+    it('NOVO should not list products', async () => {
+      await initWithUser({ id: 1, role: Role.NOVO });
+
+      await request(app.getHttpServer()).get('/products').expect(403);
+    });
+  });
 
   //-----------------------------
-  // FIND ONE
+  // GET ONE
   //-----------------------------
-  describe('GET /products/:id', () => {});
+  describe('GET /products/:id', () => {
+    it('ADMIN should get a product', async () => {
+      await initWithUser({ id: 1, role: Role.ADMIN });
+
+      prismaMock.product.findUnique.mockResolvedValue({
+        id: 1,
+        name: 'Product A',
+        obs: 'Description A',
+        price: 100,
+        quantity: 50,
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/products/1')
+        .expect(200);
+
+      expect(res.body.id).toBe(1);
+    });
+
+    it('ESTOQUE should get a product', async () => {
+      await initWithUser({ id: 1, role: Role.ESTOQUE });
+
+      prismaMock.product.findUnique.mockResolvedValue({
+        id: 1,
+        name: 'Product A',
+        obs: 'Description A',
+        price: 100,
+        quantity: 50,
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/products/1')
+        .expect(200);
+
+      expect(res.body.id).toBe(1);
+    });
+
+    it('CAIXA should get a product', async () => {
+      await initWithUser({ id: 1, role: Role.CAIXA });
+
+      prismaMock.product.findUnique.mockResolvedValue({
+        id: 1,
+        name: 'Product A',
+        obs: 'Description A',
+        price: 100,
+        quantity: 50,
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/products/1')
+        .expect(200);
+
+      expect(res.body.id).toBe(1);
+    });
+
+    it('NOVO should not get a product', async () => {
+      await initWithUser({ id: 1, role: Role.NOVO });
+
+      await request(app.getHttpServer()).get('/products/1').expect(403);
+    });
+  });
 
   //-----------------------------
   // UPDATE
   //-----------------------------
-  describe('PATCH /products/:id', () => {});
+  describe('PATCH /products/:id', () => {
+    it('ADMIN should update a product', async () => {
+      await initWithUser({ id: 1, role: Role.ADMIN });
+
+      prismaMock.product.update.mockResolvedValue({
+        id: 1,
+        name: 'Product A',
+        obs: 'Description A',
+        price: 100,
+        quantity: 50,
+      });
+
+      const res = await request(app.getHttpServer())
+        .patch('/products/1')
+        .send({ name: 'Product A' })
+        .expect(200);
+
+      expect(res.body.id).toBe(1);
+    });
+
+    it('ESTOQUE should update a product', async () => {
+      await initWithUser({ id: 1, role: Role.ESTOQUE });
+
+      prismaMock.product.update.mockResolvedValue({
+        id: 1,
+        name: 'Product A',
+        obs: 'Description A',
+        price: 100,
+        quantity: 50,
+      });
+
+      const res = await request(app.getHttpServer())
+        .patch('/products/1')
+        .send({ name: 'Product A' })
+        .expect(200);
+
+      expect(res.body.id).toBe(1);
+    });
+
+    it('CAIXA should not update a product', async () => {
+      await initWithUser({ id: 1, role: Role.CAIXA });
+
+      await request(app.getHttpServer())
+        .patch('/products/1')
+        .send({ name: 'Product A' })
+        .expect(403);
+    });
+
+    it('NOVO should not update a product', async () => {
+      await initWithUser({ id: 1, role: Role.NOVO });
+
+      await request(app.getHttpServer())
+        .patch('/products/1')
+        .send({ name: 'Product A' })
+        .expect(403);
+    });
+  });
 
   //-----------------------------
   // REMOVE
   //-----------------------------
-  describe('DELETE /products/:id', () => {});
+  describe('DELETE /products/:id', () => {
+    it('ADMIN should delete a product', async () => {
+      await initWithUser({ id: 1, role: Role.ADMIN });
+
+      prismaMock.product.delete.mockResolvedValue({
+        id: 1,
+        name: 'Product A',
+        obs: 'Description A',
+        price: 100,
+        quantity: 50,
+      });
+
+      await request(app.getHttpServer()).delete('/products/1').expect(200);
+    });
+
+    it('ESTOQUE should delete a product', async () => {
+      await initWithUser({ id: 1, role: Role.ESTOQUE });
+
+      prismaMock.product.delete.mockResolvedValue({
+        id: 1,
+        name: 'Product A',
+        obs: 'Description A',
+        price: 100,
+        quantity: 50,
+      });
+
+      await request(app.getHttpServer()).delete('/products/1').expect(200);
+    });
+
+    it('CAIXA should not delete a product', async () => {
+      await initWithUser({ id: 1, role: Role.CAIXA });
+
+      await request(app.getHttpServer()).delete('/products/1').expect(403);
+    });
+
+    it('NOVO should not delete a product', async () => {
+      await initWithUser({ id: 1, role: Role.NOVO });
+
+      await request(app.getHttpServer()).delete('/products/1').expect(403);
+    });
+  });
 });
